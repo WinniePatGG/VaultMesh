@@ -8,12 +8,17 @@ import org.bukkit.inventory.ItemStack;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 public final class StorageNetwork {
 
     private final String name;
     private final Set<String> linkedContainers = new LinkedHashSet<>();
+    private final Set<UUID> members = new LinkedHashSet<>();
     private int maxContainers = 1;
+    private UUID owner;
+    private String ownerName;
+    private boolean publicAccess = true;
     private Inventory inventory;
     private List<Inventory> openContainers;
     private ItemStack[] buffer;
@@ -37,6 +42,45 @@ public final class StorageNetwork {
 
     public void setMaxContainers(int maxContainers) {
         this.maxContainers = Math.max(1, maxContainers);
+    }
+
+    public UUID getOwner() {
+        return owner;
+    }
+
+    public String getOwnerName() {
+        return ownerName;
+    }
+
+    public void setOwner(UUID owner, String ownerName) {
+        this.owner = owner;
+        this.ownerName = ownerName;
+    }
+
+    public boolean isPublic() {
+        return publicAccess;
+    }
+
+    public void setPublic(boolean publicAccess) {
+        this.publicAccess = publicAccess;
+    }
+
+    public Set<UUID> getMembers() {
+        return members;
+    }
+
+    public boolean isMember(UUID id) {
+        return id != null && members.contains(id);
+    }
+
+    public void addMember(UUID id) {
+        if (id != null) {
+            members.add(id);
+        }
+    }
+
+    public void removeMember(UUID id) {
+        members.remove(id);
     }
 
     public Inventory getInventory() {

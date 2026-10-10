@@ -90,12 +90,90 @@ public final class StorageManager {
         return networks.get(name.toLowerCase(Locale.ROOT));
     }
 
-    public boolean createNetwork(String name) {
+    public boolean createNetwork(String name, Player creator) {
         if (!isValidName(name) || getNetwork(name) != null) {
             return false;
         }
 
-        networks.put(name.toLowerCase(Locale.ROOT), new StorageNetwork(name));
+        StorageNetwork network = new StorageNetwork(name);
+
+        if (creator != null) {
+            network.setOwner(creator.getUniqueId(), creator.getName());
+            network.setPublic(false);
+        } else {
+            network.setPublic(true);
+        }
+
+        networks.put(name.toLowerCase(Locale.ROOT), network);
+        save();
+        return true;
+    }
+
+    public boolean canAccess(Player player, StorageNetwork network) {
+        if (network == null) {
+            return false;
+        }
+
+        if (player.hasPermission("vaultmesh.manage")) {
+            return true;
+        }
+
+        if (network.getOwner() == null || network.isPublic()) {
+            return true;
+        }
+
+        UUID id = player.getUniqueId();
+        return network.getOwner().equals(id) || network.isMember(id);
+    }
+
+    public boolean canManage(Player player, StorageNetwork network) {
+        if (network == null) {
+            return false;
+        }
+
+        if (player.hasPermission("vaultmesh.manage")) {
+            return true;
+        }
+
+        return network.getOwner() != null
+                && network.getOwner().equals(player.getUniqueId());
+    }
+
+    public boolean addMember(String name, UUID memberId) {
+        StorageNetwork network = getNetwork(name);
+
+        if (network == null || memberId == null
+                || network.getOwner() == null
+                || network.getOwner().equals(memberId)
+                || network.isMember(memberId)) {
+            return false;
+        }
+
+        network.addMember(memberId);
+        save();
+        return true;
+    }
+
+    public boolean removeMember(String name, UUID memberId) {
+        StorageNetwork network = getNetwork(name);
+
+        if (network == null || memberId == null || !network.isMember(memberId)) {
+            return false;
+        }
+
+        network.removeMember(memberId);
+        save();
+        return true;
+    }
+
+    public boolean setPublic(String name, boolean publicAccess) {
+        StorageNetwork network = getNetwork(name);
+
+        if (network == null) {
+            return false;
+        }
+
+        network.setPublic(publicAccess);
         save();
         return true;
     }
@@ -207,7 +285,7 @@ public final class StorageManager {
     }
 
     public boolean unlinkContainer(Player player, Block block) {
-        if (pendingUnlinks.remove(player.getUniqueId()) == null
+        if (!pendingUnlinks.containsKey(player.getUniqueId())
                 || !isSupportedContainer(block)) {
             return false;
         }
@@ -219,6 +297,14 @@ public final class StorageManager {
         }
 
         StorageNetwork network = getNetwork(networkName);
+
+        if (network != null && !canManage(player, network)) {
+            player.sendMessage("§cYou don't have permission to modify that network.");
+            pendingUnlinks.remove(player.getUniqueId());
+            return false;
+        }
+
+        pendingUnlinks.remove(player.getUniqueId());
 
         if (network != null) {
             network.removeContainer(block.getLocation());
@@ -243,6 +329,11 @@ public final class StorageManager {
 
         if (network == null) {
             player.sendMessage("§cThat storage network does not exist.");
+            return;
+        }
+
+        if (!canAccess(player, network)) {
+            player.sendMessage("§cYou don't have access to that storage network.");
             return;
         }
 

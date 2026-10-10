@@ -7,6 +7,7 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.util.LinkedHashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.UUID;
 
 public final class NetworkRepository {
 
@@ -44,6 +45,29 @@ public final class NetworkRepository {
             network.setMaxContainers(networkSection.getInt(
                     "max-containers",
                     network.getLinkedContainers().size()));
+
+            String ownerId = networkSection.getString("owner");
+
+            if (ownerId != null) {
+                try {
+                    network.setOwner(
+                            UUID.fromString(ownerId),
+                            networkSection.getString("owner-name"));
+                } catch (IllegalArgumentException ignored) {
+                    // Malformed owner uuid - treat the network as unowned.
+                }
+            }
+
+            network.setPublic(networkSection.getBoolean("public", ownerId == null));
+
+            for (String memberId : networkSection.getStringList("members")) {
+                try {
+                    network.addMember(UUID.fromString(memberId));
+                } catch (IllegalArgumentException ignored) {
+                    // Skip malformed member uuid.
+                }
+            }
+
             networks.put(name.toLowerCase(Locale.ROOT), network);
         }
 
@@ -60,6 +84,15 @@ public final class NetworkRepository {
             config.set(path + ".containers",
                     network.getLinkedContainers().stream().toList());
             config.set(path + ".max-containers", network.getMaxContainers());
+
+            if (network.getOwner() != null) {
+                config.set(path + ".owner", network.getOwner().toString());
+                config.set(path + ".owner-name", network.getOwnerName());
+            }
+
+            config.set(path + ".public", network.isPublic());
+            config.set(path + ".members",
+                    network.getMembers().stream().map(UUID::toString).toList());
         }
 
         plugin.saveConfig();
