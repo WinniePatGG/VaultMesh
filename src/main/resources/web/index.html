@@ -1,0 +1,256 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VaultMesh Network Map</title>
+<style>
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: #0d1117; overflow: hidden;
+    font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, sans-serif; color: #d7dde5; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; }
+  #updated { position: fixed; right: 14px; bottom: 14px; padding: 8px 12px; border-radius: 10px;
+    background: rgba(20,26,35,.85); border: 1px solid #263244; font-size: 12px;
+    color: #8b98a8; backdrop-filter: blur(6px); }
+  #legend { position: fixed; bottom: 14px; left: 14px; padding: 10px 12px; border-radius: 10px;
+    background: rgba(20,26,35,.85); border: 1px solid #263244; font-size: 12px;
+    display: flex; gap: 14px; flex-wrap: wrap; backdrop-filter: blur(6px); }
+  #legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+  #tip { position: fixed; pointer-events: none; padding: 8px 10px; border-radius: 8px;
+    background: rgba(12,16,22,.95); border: 1px solid #33445c; font-size: 12px;
+    line-height: 1.45; display: none; max-width: 240px; z-index: 10; }
+  #tip b { color: #f5c34a; }
+  #err { position: fixed; top: 14px; right: 14px; padding: 10px 12px; border-radius: 8px;
+    background: rgba(90,20,20,.9); border: 1px solid #a33; font-size: 12px; display: none; }
+</style>
+</head>
+<body>
+<canvas id="graph"></canvas>
+<div id="legend">
+  <span><i class="dot" style="background:#f5c34a"></i>network</span>
+  <span><i class="dot" style="background:#c98b3b"></i>container</span>
+  <span><i class="dot" style="background:#3a3a3a;border:1px dashed #6b7686"></i>free upgrade slot</span>
+  <span><i class="dot" style="background:#666"></i>unloaded</span>
+</div>
+<div id="tip"></div>
+<div id="err"></div>
+<div id="updated"></div>
+<script>
+const token = new URLSearchParams(location.search).get('token');
+const API = '/api/networks' + (token ? '?token=' + encodeURIComponent(token) : '');
+const canvas = document.getElementById('graph');
+const ctx = canvas.getContext('2d');
+const tip = document.getElementById('tip');
+const updatedEl = document.getElementById('updated');
+const errEl = document.getElementById('err');
+
+let nodes = [], edges = [], byId = {}, positions = {}, hover = null;
+let W = 0, H = 0, dpr = 1;
+
+function resize() {
+  dpr = window.devicePixelRatio || 1;
+  W = window.innerWidth; H = window.innerHeight;
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', resize);
+resize();
+
+function colorFor(type) {
+  if (type === 'CHEST' || type === 'TRAPPED_CHEST') return '#c98b3b';
+  if (type === 'BARREL') return '#9c6b3f';
+  if (type === 'UNKNOWN') return '#666';
+  return '#5b8def';
+}
+
+function build(data) {
+  const nets = data.networks || [];
+  const next = [];
+  const nextEdges = [];
+  const cx = W / 2, cy = H / 2;
+  const radius = Math.min(W, H) * Math.max(0.18, Math.min(0.42, nets.length * 0.11));
+
+  nets.forEach((net, i) => {
+    const angle = nets.length === 1 ? 0 : (i / nets.length) * Math.PI * 2 - Math.PI / 2;
+    const hubId = 'net:' + net.name;
+    const ax = nets.length === 1 ? cx : cx + Math.cos(angle) * radius;
+    const ay = nets.length === 1 ? cy : cy + Math.sin(angle) * radius;
+    const hub = place(hubId, 'hub', net.name,
+      { ax, ay, rad: 20, meta: net });
+    next.push(hub);
+
+    net.containers.forEach((c) => {
+      const id = hubId + '|c:' + c.world + ',' + c.x + ',' + c.y + ',' + c.z;
+      next.push(place(id, 'container', c.type,
+        { rad: 8, meta: c, parent: hubId, color: colorFor(c.type) }));
+      nextEdges.push({ a: hubId, b: id, ghost: false });
+    });
+
+    for (let g = 0; g < Math.max(0, net.capacity - net.linked); g++) {
+      const id = hubId + '|g:' + g;
+      next.push(place(id, 'ghost', 'free', { rad: 5, parent: hubId }));
+      nextEdges.push({ a: hubId, b: id, ghost: true });
+    }
+  });
+
+  nodes = next;
+  edges = nextEdges;
+  byId = {};
+  nodes.forEach((n) => { byId[n.id] = n; });
+
+  updatedEl.textContent = 'Updated ' + new Date(data.generatedAt).toLocaleTimeString();
+}
+
+function place(id, type, label, extra) {
+  const saved = positions[id];
+  const n = Object.assign({
+    id, type, label, x: 0, y: 0, vx: 0, vy: 0,
+    ax: 0, ay: 0, rad: 8, meta: null, parent: null, color: '#888'
+  }, extra || {});
+  if (saved) { n.x = saved.x; n.y = saved.y; }
+  else { n.x = n.ax || (W / 2 + (Math.random() - 0.5) * 200);
+         n.y = n.ay || (H / 2 + (Math.random() - 0.5) * 200); }
+  return n;
+}
+
+function step() {
+  for (let i = 0; i < nodes.length; i++) {
+    const a = nodes[i];
+    for (let j = i + 1; j < nodes.length; j++) {
+      const b = nodes[j];
+      let dx = b.x - a.x, dy = b.y - a.y;
+      let d2 = dx * dx + dy * dy;
+      if (d2 < 1) d2 = 1;
+      const d = Math.sqrt(d2);
+      const f = ((a.rad + b.rad) * 90) / d2;
+      const fx = (dx / d) * f, fy = (dy / d) * f;
+      a.vx -= fx; a.vy -= fy; b.vx += fx; b.vy += fy;
+    }
+  }
+
+  for (const e of edges) {
+    const a = byId[e.a], b = byId[e.b];
+    if (!a || !b) continue;
+    let dx = b.x - a.x, dy = b.y - a.y;
+    const d = Math.hypot(dx, dy) || 1;
+    const rest = e.ghost ? 70 : 95;
+    const f = (d - rest) * 0.02;
+    const fx = (dx / d) * f, fy = (dy / d) * f;
+    a.vx += fx; a.vy += fy; b.vx -= fx; b.vy -= fy;
+  }
+
+  for (const n of nodes) {
+    if (n.type === 'hub') {
+      n.vx += (n.ax - n.x) * 0.06;
+      n.vy += (n.ay - n.y) * 0.06;
+    } else {
+      const hub = byId[n.parent];
+      if (hub) { n.vx += (hub.x - n.x) * 0.002; n.vy += (hub.y - n.y) * 0.002; }
+    }
+    n.vx *= 0.86; n.vy *= 0.86;
+    n.x += n.vx; n.y += n.vy;
+    n.x = Math.max(30, Math.min(W - 30, n.x));
+    n.y = Math.max(30, Math.min(H - 30, n.y));
+    positions[n.id] = { x: n.x, y: n.y };
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, W, H);
+
+  for (const e of edges) {
+    const a = byId[e.a], b = byId[e.b];
+    if (!a || !b) continue;
+    ctx.beginPath();
+    ctx.setLineDash(e.ghost ? [4, 4] : []);
+    ctx.strokeStyle = e.ghost ? 'rgba(120,130,145,.35)' : 'rgba(150,160,175,.5)';
+    ctx.lineWidth = e.ghost ? 1 : 1.4;
+    ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke();
+  }
+  ctx.setLineDash([]);
+
+  for (const n of nodes) {
+    const isHover = hover === n;
+    const r = n.rad + (isHover ? 3 : 0);
+    ctx.beginPath();
+    ctx.arc(n.x, n.y, r, 0, Math.PI * 2);
+    if (n.type === 'ghost') {
+      ctx.setLineDash([3, 3]);
+      ctx.fillStyle = '#20242b';
+      ctx.strokeStyle = '#6b7686';
+    } else {
+      ctx.fillStyle = n.color || (n.type === 'hub' ? '#f5c34a' : '#888');
+      ctx.strokeStyle = isHover ? '#fff' : 'rgba(0,0,0,.4)';
+    }
+    ctx.fill(); ctx.stroke();
+    ctx.setLineDash([]);
+
+    if (n.type === 'hub') {
+      ctx.fillStyle = '#f5c34a';
+      ctx.font = '600 13px ui-sans-serif, system-ui, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(n.label, n.x, n.y + r + 15);
+      ctx.font = '11px ui-sans-serif, system-ui, sans-serif';
+      ctx.fillStyle = '#8b98a8';
+      ctx.fillText(n.meta.linked + '/' + n.meta.capacity + ' - ' + n.meta.pages + ' page(s)',
+        n.x, n.y + r + 29);
+    }
+  }
+}
+
+function frame() { step(); draw(); requestAnimationFrame(frame); }
+
+function locate(mx, my) {
+  let best = null, bestD = 1e9;
+  for (const n of nodes) {
+    const d = Math.hypot(n.x - mx, n.y - my);
+    if (d < n.rad + 6 && d < bestD) { best = n; bestD = d; }
+  }
+  return best;
+}
+
+canvas.addEventListener('mousemove', (e) => {
+  const n = locate(e.clientX, e.clientY);
+  hover = n;
+  if (!n) { tip.style.display = 'none'; return; }
+  tip.style.display = 'block';
+  tip.style.left = (e.clientX + 14) + 'px';
+  tip.style.top = (e.clientY + 14) + 'px';
+  if (n.type === 'hub') {
+    tip.innerHTML = '<b>' + esc(n.label) + '</b><br>' + n.meta.linked + ' linked / '
+      + n.meta.capacity + ' slots<br>' + n.meta.pages + ' page(s), '
+      + n.meta.totalSlots + ' storage slots';
+  } else if (n.type === 'ghost') {
+    tip.innerHTML = '<b>Free container slot</b><br>Right-click upgrade item with '
+      + '<b>/vm upgrade</b> then link a chest';
+  } else {
+    const c = n.meta;
+    tip.innerHTML = '<b>' + esc(c.type) + '</b><br>' + esc(c.world) + ' '
+      + c.x + ', ' + c.y + ', ' + c.z + '<br>' + (c.loaded ? c.slots + ' slots' : 'chunk unloaded');
+  }
+});
+canvas.addEventListener('mouseleave', () => { hover = null; tip.style.display = 'none'; });
+
+function esc(s) { return String(s).replace(/[&<>"]/g, (c) =>
+  ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c])); }
+
+async function refresh() {
+  try {
+    const res = await fetch(API, { cache: 'no-store' });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    build(await res.json());
+    errEl.style.display = 'none';
+  } catch (err) {
+    errEl.style.display = 'block';
+    errEl.textContent = 'Update failed: ' + err.message;
+  }
+}
+
+refresh();
+setInterval(refresh, 5000);
+frame();
+</script>
+</body>
+</html>

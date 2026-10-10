@@ -733,6 +733,25 @@ public final class StorageManager {
         }
     }
 
+    /**
+     * Returns the block material name for a linked container key, or {@code null}
+     * if the world/coords are invalid or the chunk is not loaded. Must be called
+     * from the primary server thread.
+     */
+    public String containerTypeName(String key) {
+        Block block = blockFromKey(key);
+
+        if (block == null) {
+            return null;
+        }
+
+        if (!block.getWorld().isChunkLoaded(block.getX() >> 4, block.getZ() >> 4)) {
+            return null;
+        }
+
+        return block.getType().name();
+    }
+
     private boolean isSupportedContainer(Block block) {
         return block.getType().name().equals("CHEST")
                 || block.getType().name().equals("TRAPPED_CHEST")
