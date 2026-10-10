@@ -49,6 +49,17 @@ public final class ContainerListener implements Listener {
                 return;
             }
 
+            String pendingLink = manager.getPendingLinkNetwork(player);
+
+            if (pendingLink != null && manager.isAtContainerLimit(pendingLink)) {
+                player.sendMessage("§c" + pendingLink + " is full ("
+                        + manager.getMaxContainers(pendingLink) + " container slots).");
+                player.sendMessage("§7Use /vm upgrade " + pendingLink
+                        + " to add another slot.");
+                manager.cancelPendingAction(player);
+                return;
+            }
+
             if (manager.linkContainer(player, block)) {
                 player.sendMessage("§aContainer linked successfully.");
                 return;

@@ -144,6 +144,21 @@ public final class StorageManager {
         return pendingLinks.containsKey(id) || pendingUnlinks.containsKey(id);
     }
 
+    public String getPendingLinkNetwork(Player player) {
+        return pendingLinks.get(player.getUniqueId());
+    }
+
+    public boolean isAtContainerLimit(String name) {
+        StorageNetwork network = getNetwork(name);
+        return network != null
+                && network.getLinkedContainers().size() >= network.getMaxContainers();
+    }
+
+    public int getMaxContainers(String name) {
+        StorageNetwork network = getNetwork(name);
+        return network == null ? 0 : network.getMaxContainers();
+    }
+
     public boolean linkContainer(Player player, Block block) {
         String networkName = pendingLinks.remove(player.getUniqueId());
 
@@ -154,6 +169,13 @@ public final class StorageManager {
         StorageNetwork network = getNetwork(networkName);
 
         if (network == null) {
+            return false;
+        }
+
+        String key = StorageNetwork.locationKey(block.getLocation());
+
+        if (!network.getLinkedContainers().contains(key)
+                && network.getLinkedContainers().size() >= network.getMaxContainers()) {
             return false;
         }
 
@@ -236,7 +258,6 @@ public final class StorageManager {
             network.setOpenContainers(containers);
             network.setBuffer(loadBuffer(containers));
             network.setCurrentPage(0);
-            clampUnlockedPages(network, containers);
 
             NetworkHolder holder = new NetworkHolder(network.getName());
             inventory = Bukkit.createInventory(
@@ -295,10 +316,8 @@ public final class StorageManager {
         if (slot == NEXT_SLOT) {
             int next = network.getCurrentPage() + 1;
 
-            if (next < network.getUnlockedPages()) {
+            if (next < maxPages(network)) {
                 navigateTo(network, inventory, next);
-            } else if (next < maxPages(network)) {
-                player.sendMessage("§cThat page is locked. Use a VaultMesh Upgrade to unlock it.");
             }
             return;
         }
@@ -306,7 +325,8 @@ public final class StorageManager {
         if (slot == INFO_SLOT) {
             player.sendMessage("§6" + network.getName() + "§7 - page "
                     + (network.getCurrentPage() + 1) + "/" + maxPages(network)
-                    + "§7 (" + network.getUnlockedPages() + " unlocked)");
+                    + "§7, " + network.getLinkedContainers().size()
+                    + "/" + network.getMaxContainers() + " containers");
         }
     }
 
@@ -381,14 +401,6 @@ public final class StorageManager {
             return false;
         }
 
-        int max = maxPages(network);
-
-        if (network.getUnlockedPages() >= max) {
-            player.sendMessage("§cThis network already has all " + max
-                    + " page(s) unlocked. Link more containers for more pages.");
-            return true;
-        }
-
         ItemStack hand = player.getInventory().getItemInMainHand();
 
         if (!isUpgradeItem(hand)) {
@@ -401,7 +413,7 @@ public final class StorageManager {
         player.getInventory().setItemInMainHand(
                 remaining.getAmount() <= 0 ? null : remaining);
 
-        network.setUnlockedPages(network.getUnlockedPages() + 1);
+        network.setMaxContainers(network.getMaxContainers() + 1);
 
         Inventory open = network.getInventory();
 
@@ -411,8 +423,8 @@ public final class StorageManager {
         }
 
         save();
-        player.sendMessage("§aUpgraded §e" + network.getName() + "§a to "
-                + network.getUnlockedPages() + " page(s).");
+        player.sendMessage("§aUpgraded §e" + network.getName() + "§a - it can now hold "
+                + network.getMaxContainers() + " container(s).");
         return true;
     }
 
@@ -439,7 +451,7 @@ public final class StorageManager {
                             .color(NamedTextColor.GRAY),
                     Component.text("/vm upgrade <network>")
                             .color(NamedTextColor.YELLOW),
-                    Component.text("to unlock the next storage page.")
+                    Component.text("to add another container slot.")
                             .color(NamedTextColor.GRAY)
             ));
             meta.getPersistentDataContainer()
@@ -519,16 +531,9 @@ public final class StorageManager {
         }
 
         if (page + 1 < maxPages) {
-            if (page + 1 < network.getUnlockedPages()) {
-                inventory.setItem(NEXT_SLOT, titled(Material.ARROW,
-                        Component.text("Next page").color(NamedTextColor.YELLOW),
-                        null));
-            } else {
-                inventory.setItem(NEXT_SLOT, titled(Material.BARRIER,
-                        Component.text("Page locked").color(NamedTextColor.RED),
-                        List.of(Component.text("Unlock with a VaultMesh Upgrade")
-                                .color(NamedTextColor.GRAY))));
-            }
+            inventory.setItem(NEXT_SLOT, titled(Material.ARROW,
+                    Component.text("Next page").color(NamedTextColor.YELLOW),
+                    null));
         }
 
         inventory.setItem(INFO_SLOT, titled(Material.BOOK,
@@ -536,8 +541,9 @@ public final class StorageManager {
                 List.of(
                         Component.text("Page " + (page + 1) + " of " + maxPages)
                                 .color(NamedTextColor.GRAY),
-                        Component.text(network.getUnlockedPages()
-                                        + " of " + maxPages + " pages unlocked")
+                        Component.text(network.getLinkedContainers().size()
+                                        + " of " + network.getMaxContainers()
+                                        + " container slots used")
                                 .color(NamedTextColor.GRAY)
                 )));
     }
@@ -646,14 +652,6 @@ public final class StorageManager {
         }
 
         return total;
-    }
-
-    private void clampUnlockedPages(StorageNetwork network, List<Inventory> containers) {
-        int max = Math.max(1, (totalSlots(containers) + PAGE_SIZE - 1) / PAGE_SIZE);
-
-        if (network.getUnlockedPages() > max) {
-            network.setUnlockedPages(max);
-        }
     }
 
     private void clearSession(StorageNetwork network) {

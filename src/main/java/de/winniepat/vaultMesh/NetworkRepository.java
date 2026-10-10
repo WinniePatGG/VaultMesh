@@ -41,7 +41,9 @@ public final class NetworkRepository {
                 network.getLinkedContainers().add(key);
             }
 
-            network.setUnlockedPages(networkSection.getInt("pages", 1));
+            network.setMaxContainers(networkSection.getInt(
+                    "max-containers",
+                    network.getLinkedContainers().size()));
             networks.put(name.toLowerCase(Locale.ROOT), network);
         }
 
@@ -57,7 +59,7 @@ public final class NetworkRepository {
 
             config.set(path + ".containers",
                     network.getLinkedContainers().stream().toList());
-            config.set(path + ".pages", network.getUnlockedPages());
+            config.set(path + ".max-containers", network.getMaxContainers());
         }
 
         plugin.saveConfig();

@@ -13,7 +13,7 @@ public final class StorageNetwork {
 
     private final String name;
     private final Set<String> linkedContainers = new LinkedHashSet<>();
-    private int unlockedPages = 1;
+    private int maxContainers = 1;
     private Inventory inventory;
     private List<Inventory> openContainers;
     private ItemStack[] buffer;
@@ -31,12 +31,12 @@ public final class StorageNetwork {
         return linkedContainers;
     }
 
-    public int getUnlockedPages() {
-        return unlockedPages;
+    public int getMaxContainers() {
+        return maxContainers;
     }
 
-    public void setUnlockedPages(int unlockedPages) {
-        this.unlockedPages = Math.max(1, unlockedPages);
+    public void setMaxContainers(int maxContainers) {
+        this.maxContainers = Math.max(1, maxContainers);
     }
 
     public Inventory getInventory() {

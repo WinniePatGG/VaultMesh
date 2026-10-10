@@ -229,7 +229,7 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/vm link <name> §7- Link a container");
         sender.sendMessage("§e/vm unlink §7- Unlink a container");
         sender.sendMessage("§e/vm open <name> §7- Open a network");
-        sender.sendMessage("§e/vm upgrade <name> §7- Unlock the next page");
+        sender.sendMessage("§e/vm upgrade <name> §7- Add a container slot");
         sender.sendMessage("§e/vm giveupgrade [amount] §7- Get upgrade items");
         sender.sendMessage("§e/vm list §7- List networks");
         sender.sendMessage("§e/vm delete <name> §7- Delete a network");
