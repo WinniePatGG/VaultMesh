@@ -1,0 +1,25 @@
+name: VaultMesh
+description: $description
+version: '${version}'
+
+main: de.winniepat.vaultMesh.VaultMesh
+api-version: '1.21.11'
+load: POSTWORLD
+
+authors: [WinniePatGG]
+website: https://winniepat.de
+
+commands:
+  vaultmesh:
+    description: Manage VaultMesh storage networks.
+    usage: /vaultmesh <create|link|unlink|open|list|delete|cancel>
+    aliases: [vm]
+
+permissions:
+  vaultmesh.use:
+    description: Open and use shared storage networks.
+    default: true
+
+  vaultmesh.manage:
+    description: Create, link, unlink, and delete storage networks.
+    default: op
