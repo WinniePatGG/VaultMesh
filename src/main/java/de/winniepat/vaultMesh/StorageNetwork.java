@@ -6,6 +6,7 @@ import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 public final class StorageNetwork {
@@ -14,6 +15,7 @@ public final class StorageNetwork {
     private final Set<String> linkedContainers = new LinkedHashSet<>();
     private ItemStack[] contents;
     private Inventory inventory;
+    private List<Inventory> openContainers;
 
     public StorageNetwork(String name, int inventorySize) {
         this.name = name;
@@ -42,6 +44,14 @@ public final class StorageNetwork {
 
     public void setInventory(Inventory inventory) {
         this.inventory = inventory;
+    }
+
+    public List<Inventory> getOpenContainers() {
+        return openContainers;
+    }
+
+    public void setOpenContainers(List<Inventory> openContainers) {
+        this.openContainers = openContainers;
     }
 
     public boolean hasViewers() {

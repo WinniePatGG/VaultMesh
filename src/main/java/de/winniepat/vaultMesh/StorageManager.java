@@ -4,15 +4,21 @@ package de.winniepat.vaultMesh;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.NamespacedKey;
+import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
+import org.bukkit.block.BlockState;
+import org.bukkit.block.Chest;
 import org.bukkit.block.TileState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -43,8 +49,18 @@ public final class StorageManager {
 
     public void save() {
         for (StorageNetwork network : networks.values()) {
-            if (network.getInventory() != null) {
-                network.setContents(network.getInventory().getContents());
+            Inventory open = network.getInventory();
+
+            if (open == null) {
+                continue;
+            }
+
+            List<Inventory> containers = network.getOpenContainers();
+
+            if (containers != null && !containers.isEmpty()) {
+                distributeContents(open.getContents(), containers);
+            } else {
+                network.setContents(open.getContents());
             }
         }
 
@@ -202,14 +218,32 @@ public final class StorageManager {
 
         if (inventory == null) {
             NetworkHolder holder = new NetworkHolder(network.getName());
-            inventory = Bukkit.createInventory(
-                    holder,
-                    INVENTORY_SIZE,
-                    "VaultMesh: " + network.getName()
-            );
+            List<Inventory> containers = resolveInventories(network);
 
-            holder.setInventory(inventory);
-            inventory.setContents(network.getContents());
+            if (containers.isEmpty()) {
+                inventory = Bukkit.createInventory(
+                        holder,
+                        INVENTORY_SIZE,
+                        "VaultMesh: " + network.getName()
+                );
+
+                holder.setInventory(inventory);
+                inventory.setContents(network.getContents());
+                network.setOpenContainers(null);
+            } else {
+                int size = computeViewSize(containers);
+
+                inventory = Bukkit.createInventory(
+                        holder,
+                        size,
+                        "VaultMesh: " + network.getName()
+                );
+
+                holder.setInventory(inventory);
+                inventory.setContents(poolContents(containers, size));
+                network.setOpenContainers(containers);
+            }
+
             network.setInventory(inventory);
         }
 
@@ -223,17 +257,108 @@ public final class StorageManager {
             return;
         }
 
-        network.setContents(inventory.getContents());
-
-        // Run after Bukkit has finished removing the closing viewer.
         Bukkit.getScheduler().runTask(plugin, () -> {
-            if (inventory.getViewers().isEmpty()) {
-                network.setContents(inventory.getContents());
-                network.setInventory(null);
+            if (!inventory.getViewers().isEmpty()) {
+                return;
             }
 
+            List<Inventory> containers = network.getOpenContainers();
+
+            if (containers != null && !containers.isEmpty()) {
+                distributeContents(inventory.getContents(), containers);
+                network.setOpenContainers(null);
+            } else {
+                network.setContents(inventory.getContents());
+            }
+
+            network.setInventory(null);
             save();
         });
+    }
+
+    private List<Inventory> resolveInventories(StorageNetwork network) {
+        List<Inventory> inventories = new ArrayList<>();
+
+        for (String key : network.getLinkedContainers()) {
+            Block block = blockFromKey(key);
+
+            if (block == null) {
+                continue;
+            }
+
+            BlockState state = block.getState();
+
+            if (state instanceof Chest chest) {
+                inventories.add(chest.getBlockInventory());
+            } else if (state instanceof Barrel barrel) {
+                inventories.add(barrel.getInventory());
+            }
+        }
+
+        return inventories;
+    }
+
+    private int computeViewSize(List<Inventory> containers) {
+        int size = 0;
+
+        for (Inventory container : containers) {
+            int containerSize = container.getSize();
+
+            if (size + containerSize > INVENTORY_SIZE) {
+                break;
+            }
+
+            size += containerSize;
+        }
+
+        return size;
+    }
+
+    private ItemStack[] poolContents(List<Inventory> containers, int size) {
+        ItemStack[] view = new ItemStack[size];
+        int offset = 0;
+
+        for (Inventory container : containers) {
+            int containerSize = container.getSize();
+
+            if (offset + containerSize > size) {
+                break;
+            }
+
+            ItemStack[] contents = container.getContents();
+
+            for (int i = 0; i < containerSize; i++) {
+                ItemStack stack = contents[i];
+                view[offset + i] = stack == null ? null : stack.clone();
+            }
+
+            offset += containerSize;
+        }
+
+        return view;
+    }
+
+    private void distributeContents(ItemStack[] view, List<Inventory> containers) {
+        int offset = 0;
+
+        for (Inventory container : containers) {
+            int containerSize = container.getSize();
+
+            if (offset + containerSize > view.length) {
+                break;
+            }
+
+            ItemStack[] slice = new ItemStack[containerSize];
+            System.arraycopy(view, offset, slice, 0, containerSize);
+
+            try {
+                container.setContents(slice);
+            } catch (RuntimeException ignored) {
+                // The container may have been removed while the network was open.
+            }
+
+            offset += containerSize;
+        }
     }
 
     public void cancelPendingAction(Player player) {

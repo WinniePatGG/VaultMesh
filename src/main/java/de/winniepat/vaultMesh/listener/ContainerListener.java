@@ -5,6 +5,7 @@ import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.TileState;
 import org.bukkit.entity.Player;
+import org.bukkit.event.Event;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
@@ -27,39 +28,54 @@ public final class ContainerListener implements Listener {
         }
 
         Player player = event.getPlayer();
-
-        if (!manager.hasPendingAction(player)) {
-            return;
-        }
-
         Block block = event.getClickedBlock();
 
         if (block == null || !isSupportedContainer(block)) {
             return;
         }
 
+        if (event.useInteractedBlock() == Event.Result.DENY) {
+            return;
+        }
+
+        if (manager.hasPendingAction(player)) {
+            event.setCancelled(true);
+
+            BlockState state = block.getState();
+
+            if (!(state instanceof TileState)) {
+                player.sendMessage("§cThis container cannot be linked.");
+                manager.cancelPendingAction(player);
+                return;
+            }
+
+            if (manager.linkContainer(player, block)) {
+                player.sendMessage("§aContainer linked successfully.");
+                return;
+            }
+
+            if (manager.unlinkContainer(player, block)) {
+                player.sendMessage("§aContainer unlinked successfully.");
+                return;
+            }
+
+            player.sendMessage("§cCould not link or unlink this container.");
+            player.sendMessage("§7It may already belong to another network.");
+            return;
+        }
+
+        if (player.isSneaking()) {
+            return;
+        }
+
+        String networkName = manager.getMarkedNetwork(block);
+
+        if (networkName == null) {
+            return;
+        }
+
         event.setCancelled(true);
-
-        BlockState state = block.getState();
-
-        if (!(state instanceof TileState)) {
-            player.sendMessage("§cThis container cannot be linked.");
-            manager.cancelPendingAction(player);
-            return;
-        }
-
-        if (manager.linkContainer(player, block)) {
-            player.sendMessage("§aContainer linked successfully.");
-            return;
-        }
-
-        if (manager.unlinkContainer(player, block)) {
-            player.sendMessage("§aContainer unlinked successfully.");
-            return;
-        }
-
-        player.sendMessage("§cCould not link or unlink this container.");
-        player.sendMessage("§7It may already belong to another network.");
+        manager.openNetwork(player, networkName);
     }
 
     private boolean isSupportedContainer(Block block) {
