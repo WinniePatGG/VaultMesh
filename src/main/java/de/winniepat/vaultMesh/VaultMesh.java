@@ -13,6 +13,7 @@ public final class VaultMesh extends JavaPlugin {
         NetworkRepository repository = new NetworkRepository(this);
         storageManager = new StorageManager(this, repository);
         storageManager.load();
+        storageManager.registerRecipes();
 
         VaultMeshCommand command = new VaultMeshCommand(storageManager);
 

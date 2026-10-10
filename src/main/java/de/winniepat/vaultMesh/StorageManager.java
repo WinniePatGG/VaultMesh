@@ -15,6 +15,7 @@ import org.bukkit.block.TileState;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.ShapedRecipe;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -460,6 +461,22 @@ public final class StorageManager {
         }
 
         return item;
+    }
+
+    public void registerRecipes() {
+        NamespacedKey key = new NamespacedKey(plugin, "upgrade");
+
+        if (Bukkit.getRecipe(key) != null) {
+            Bukkit.removeRecipe(key);
+        }
+
+        ShapedRecipe recipe = new ShapedRecipe(key, createUpgradeItem());
+        recipe.shape("DED", "ENE", "DED");
+        recipe.setIngredient('D', Material.DIAMOND);
+        recipe.setIngredient('E', Material.ENDER_PEARL);
+        recipe.setIngredient('N', Material.NETHER_STAR);
+
+        Bukkit.addRecipe(recipe);
     }
 
     public void cancelPendingAction(Player player) {
