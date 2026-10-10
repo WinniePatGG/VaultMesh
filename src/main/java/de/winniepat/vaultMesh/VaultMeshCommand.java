@@ -5,6 +5,7 @@ import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -158,6 +159,57 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (subcommand.equals("upgrade")) {
+            if (!requireManage(sender)) {
+                return true;
+            }
+
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command can only be used by a player.");
+                return true;
+            }
+
+            if (args.length < 2) {
+                sender.sendMessage("§cUsage: /vm upgrade <name>");
+                return true;
+            }
+
+            manager.upgradeNetwork(player, args[1]);
+            return true;
+        }
+
+        if (subcommand.equals("giveupgrade")) {
+            if (!requireManage(sender)) {
+                return true;
+            }
+
+            if (!(sender instanceof Player player)) {
+                sender.sendMessage("This command can only be used by a player.");
+                return true;
+            }
+
+            int amount = 1;
+
+            if (args.length >= 2) {
+                try {
+                    amount = Math.max(1, Math.min(64, Integer.parseInt(args[1])));
+                } catch (NumberFormatException exception) {
+                    player.sendMessage("§cInvalid amount.");
+                    return true;
+                }
+            }
+
+            ItemStack item = manager.createUpgradeItem();
+            item.setAmount(amount);
+
+            for (ItemStack leftover : player.getInventory().addItem(item).values()) {
+                player.getWorld().dropItemNaturally(player.getLocation(), leftover);
+            }
+
+            player.sendMessage("§aGave you " + amount + " VaultMesh Upgrade(s).");
+            return true;
+        }
+
         sendHelp(sender);
         return true;
     }
@@ -177,6 +229,8 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/vm link <name> §7- Link a container");
         sender.sendMessage("§e/vm unlink §7- Unlink a container");
         sender.sendMessage("§e/vm open <name> §7- Open a network");
+        sender.sendMessage("§e/vm upgrade <name> §7- Unlock the next page");
+        sender.sendMessage("§e/vm giveupgrade [amount] §7- Get upgrade items");
         sender.sendMessage("§e/vm list §7- List networks");
         sender.sendMessage("§e/vm delete <name> §7- Delete a network");
         sender.sendMessage("§e/vm cancel §7- Cancel a pending action");
@@ -193,12 +247,13 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
 
         if (args.length == 1) {
             suggestions.addAll(List.of(
-                    "create", "link", "unlink", "open", "list", "delete", "cancel"
+                    "create", "link", "unlink", "open", "upgrade", "giveupgrade",
+                    "list", "delete", "cancel"
             ));
         } else if (args.length == 2) {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
 
-            if (List.of("link", "open", "delete").contains(subcommand)) {
+            if (List.of("link", "open", "delete", "upgrade").contains(subcommand)) {
                 suggestions.addAll(manager.getNetworks().values().stream()
                         .map(StorageNetwork::getName)
                         .toList());

@@ -13,13 +13,14 @@ public final class StorageNetwork {
 
     private final String name;
     private final Set<String> linkedContainers = new LinkedHashSet<>();
-    private ItemStack[] contents;
+    private int unlockedPages = 1;
     private Inventory inventory;
     private List<Inventory> openContainers;
+    private ItemStack[] buffer;
+    private int currentPage;
 
-    public StorageNetwork(String name, int inventorySize) {
+    public StorageNetwork(String name) {
         this.name = name;
-        this.contents = new ItemStack[inventorySize];
     }
 
     public String getName() {
@@ -30,12 +31,12 @@ public final class StorageNetwork {
         return linkedContainers;
     }
 
-    public ItemStack[] getContents() {
-        return contents;
+    public int getUnlockedPages() {
+        return unlockedPages;
     }
 
-    public void setContents(ItemStack[] contents) {
-        this.contents = contents;
+    public void setUnlockedPages(int unlockedPages) {
+        this.unlockedPages = Math.max(1, unlockedPages);
     }
 
     public Inventory getInventory() {
@@ -54,8 +55,24 @@ public final class StorageNetwork {
         this.openContainers = openContainers;
     }
 
+    public ItemStack[] getBuffer() {
+        return buffer;
+    }
+
+    public void setBuffer(ItemStack[] buffer) {
+        this.buffer = buffer;
+    }
+
+    public int getCurrentPage() {
+        return currentPage;
+    }
+
+    public void setCurrentPage(int currentPage) {
+        this.currentPage = Math.max(0, currentPage);
+    }
+
     public boolean hasViewers() {
-        return inventory != null && inventory.getViewers().size() > 0;
+        return inventory != null && !inventory.getViewers().isEmpty();
     }
 
     public void addContainer(Location location) {

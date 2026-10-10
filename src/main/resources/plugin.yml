@@ -12,7 +12,7 @@ website: https://winniepat.de
 commands:
   vaultmesh:
     description: Manage VaultMesh storage networks.
-    usage: /vaultmesh <create|link|unlink|open|list|delete|cancel>
+    usage: /vaultmesh <create|link|unlink|open|upgrade|giveupgrade|list|delete|cancel>
     aliases: [vm]
 
 permissions:
