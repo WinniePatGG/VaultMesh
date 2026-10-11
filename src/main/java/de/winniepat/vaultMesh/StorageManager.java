@@ -72,10 +72,31 @@ public final class StorageManager {
             if (containers != null && !containers.isEmpty()) {
                 saveCurrentPage(network, open);
                 flush(network.getBuffer(), containers);
+                network.setStoredItems(countItems(network.getBuffer()));
             }
         }
 
         repository.saveNetworks(networks);
+    }
+
+    public int getTotalContainerCount() {
+        int total = 0;
+
+        for (StorageNetwork network : networks.values()) {
+            total += network.getLinkedContainers().size();
+        }
+
+        return total;
+    }
+
+    public int getTotalMemberCount() {
+        int total = 0;
+
+        for (StorageNetwork network : networks.values()) {
+            total += network.getMembers().size();
+        }
+
+        return total;
     }
 
     public Map<String, StorageNetwork> getNetworks() {
@@ -337,6 +358,8 @@ public final class StorageManager {
             return;
         }
 
+        network.markOpened();
+
         Inventory inventory = network.getInventory();
 
         if (inventory == null) {
@@ -364,6 +387,7 @@ public final class StorageManager {
         }
 
         player.openInventory(inventory);
+        save();
     }
 
     public void handleInventoryClose(Inventory inventory, NetworkHolder holder) {
@@ -384,6 +408,7 @@ public final class StorageManager {
             if (containers != null && !containers.isEmpty()) {
                 saveCurrentPage(network, inventory);
                 flush(network.getBuffer(), containers);
+                network.setStoredItems(countItems(network.getBuffer()));
             }
 
             clearSession(network);
@@ -652,6 +677,12 @@ public final class StorageManager {
                         Component.text(network.getLinkedContainers().size()
                                         + " of " + network.getMaxContainers()
                                         + " container slots used")
+                                .color(NamedTextColor.GRAY),
+                        Component.text(network.getStoredItems()
+                                        + " items stored")
+                                .color(NamedTextColor.GRAY),
+                        Component.text(network.getOpenCount()
+                                        + " total opens")
                                 .color(NamedTextColor.GRAY)
                 )));
     }
@@ -740,6 +771,22 @@ public final class StorageManager {
 
             offset += size;
         }
+    }
+
+    private long countItems(ItemStack[] buffer) {
+        if (buffer == null) {
+            return 0;
+        }
+
+        long total = 0;
+
+        for (ItemStack stack : buffer) {
+            if (stack != null) {
+                total += stack.getAmount();
+            }
+        }
+
+        return total;
     }
 
     private int maxPages(StorageNetwork network) {

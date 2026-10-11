@@ -68,6 +68,15 @@ public final class NetworkRepository {
                 }
             }
 
+            ConfigurationSection stats = networkSection.getConfigurationSection("stats");
+
+            if (stats != null) {
+                network.setCreatedTime(stats.getLong("created", network.getCreatedTime()));
+                network.setOpenCount(stats.getLong("opens", 0));
+                network.setLastOpened(stats.getLong("last-opened", 0));
+                network.setStoredItems(stats.getLong("items", 0));
+            }
+
             networks.put(name.toLowerCase(Locale.ROOT), network);
         }
 
@@ -93,6 +102,11 @@ public final class NetworkRepository {
             config.set(path + ".public", network.isPublic());
             config.set(path + ".members",
                     network.getMembers().stream().map(UUID::toString).toList());
+
+            config.set(path + ".stats.created", network.getCreatedTime());
+            config.set(path + ".stats.opens", network.getOpenCount());
+            config.set(path + ".stats.last-opened", network.getLastOpened());
+            config.set(path + ".stats.items", network.getStoredItems());
         }
 
         plugin.saveConfig();

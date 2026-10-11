@@ -174,6 +174,13 @@ public final class WebServer {
         json.append(",\"capacity\":").append(capacity);
         json.append(",\"pages\":").append(pages);
         json.append(",\"totalSlots\":").append(totalSlots);
+        json.append(",\"public\":").append(network.isPublic());
+        json.append(",\"owner\":").append(quote(network.getOwnerName()));
+        json.append(",\"members\":").append(network.getMembers().size());
+        json.append(",\"storedItems\":").append(network.getStoredItems());
+        json.append(",\"openCount\":").append(network.getOpenCount());
+        json.append(",\"created\":").append(network.getCreatedTime());
+        json.append(",\"lastOpened\":").append(network.getLastOpened());
         json.append(",\"containers\":[");
 
         boolean first = true;

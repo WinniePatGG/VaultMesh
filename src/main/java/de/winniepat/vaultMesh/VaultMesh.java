@@ -3,12 +3,17 @@ package de.winniepat.vaultMesh;
 import de.winniepat.vaultMesh.listener.ContainerListener;
 import de.winniepat.vaultMesh.listener.StorageInventoryListener;
 import de.winniepat.vaultMesh.web.WebServer;
+import org.bstats.bukkit.Metrics;
+import org.bstats.charts.SimplePie;
+import org.bstats.charts.SingleLineChart;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.io.IOException;
 
 public final class VaultMesh extends JavaPlugin {
+
+    private static final int BSTATS_PLUGIN_ID = 34631;
 
     private StorageManager storageManager;
     private WebServer webServer;
@@ -36,8 +41,35 @@ public final class VaultMesh extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new StorageInventoryListener(storageManager), this);
 
         startWebServer();
+        startMetrics();
 
         getLogger().info("VaultMesh enabled.");
+    }
+
+    private void startMetrics() {
+        if (BSTATS_PLUGIN_ID <= 0) {
+            getLogger().info("bStats metrics disabled - set BSTATS_PLUGIN_ID in VaultMesh.java.");
+            return;
+        }
+
+        try {
+            Metrics metrics = new Metrics(this, BSTATS_PLUGIN_ID);
+
+            metrics.addCustomChart(new SingleLineChart("networks",
+                    () -> storageManager.getNetworks().size()));
+            metrics.addCustomChart(new SingleLineChart("linked_containers",
+                    storageManager::getTotalContainerCount));
+            metrics.addCustomChart(new SingleLineChart("members",
+                    storageManager::getTotalMemberCount));
+            metrics.addCustomChart(new SingleLineChart("stored_items",
+                    () -> (int) storageManager.getNetworks().values().stream()
+                            .mapToLong(network -> network.getStoredItems())
+                            .sum()));
+            metrics.addCustomChart(new SimplePie("web_enabled",
+                    () -> getConfig().getBoolean("web.enabled", false) ? "true" : "false"));
+        } catch (Throwable throwable) {
+            getLogger().warning("Failed to start bStats metrics: " + throwable.getMessage());
+        }
     }
 
     @Override

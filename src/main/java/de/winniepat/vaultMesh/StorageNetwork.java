@@ -19,6 +19,10 @@ public final class StorageNetwork {
     private UUID owner;
     private String ownerName;
     private boolean publicAccess = true;
+    private long createdTime = System.currentTimeMillis();
+    private long openCount;
+    private long lastOpened;
+    private long storedItems;
     private Inventory inventory;
     private List<Inventory> openContainers;
     private ItemStack[] buffer;
@@ -81,6 +85,43 @@ public final class StorageNetwork {
 
     public void removeMember(UUID id) {
         members.remove(id);
+    }
+
+    public long getCreatedTime() {
+        return createdTime;
+    }
+
+    public void setCreatedTime(long createdTime) {
+        this.createdTime = createdTime;
+    }
+
+    public long getOpenCount() {
+        return openCount;
+    }
+
+    public void setOpenCount(long openCount) {
+        this.openCount = Math.max(0, openCount);
+    }
+
+    public long getLastOpened() {
+        return lastOpened;
+    }
+
+    public void setLastOpened(long lastOpened) {
+        this.lastOpened = Math.max(0, lastOpened);
+    }
+
+    public void markOpened() {
+        openCount++;
+        lastOpened = System.currentTimeMillis();
+    }
+
+    public long getStoredItems() {
+        return storedItems;
+    }
+
+    public void setStoredItems(long storedItems) {
+        this.storedItems = Math.max(0, storedItems);
     }
 
     public Inventory getInventory() {

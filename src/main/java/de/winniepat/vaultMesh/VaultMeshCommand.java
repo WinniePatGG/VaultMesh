@@ -9,6 +9,9 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
@@ -191,6 +194,11 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
             return true;
         }
 
+        if (subcommand.equals("stats")) {
+            handleStats(sender, args);
+            return true;
+        }
+
         if (subcommand.equals("giveupgrade")) {
             if (!requireManage(sender)) {
                 return true;
@@ -351,6 +359,64 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§cUsage: /vm members <name> <list|add|remove> [player]");
     }
 
+    private void handleStats(CommandSender sender, String[] args) {
+        if (args.length < 2) {
+            sender.sendMessage("§6VaultMesh stats:");
+
+            if (manager.getNetworks().isEmpty()) {
+                sender.sendMessage("§7No networks have been created.");
+                return;
+            }
+
+            for (StorageNetwork network : manager.getNetworks().values()) {
+                sender.sendMessage("§e- " + network.getName()
+                        + " §7| " + network.getStoredItems() + " items"
+                        + " §7| " + network.getLinkedContainers().size() + " containers"
+                        + " §7| " + network.getOpenCount() + " opens"
+                        + " §7| owner " + displayName(network.getOwner(),
+                                network.getOwnerName()));
+            }
+
+            return;
+        }
+
+        StorageNetwork network = manager.getNetwork(args[1]);
+
+        if (network == null) {
+            sender.sendMessage("§cThat storage network does not exist.");
+            return;
+        }
+
+        int linked = network.getLinkedContainers().size();
+        int totalSlots = linked * 27;
+        int pages = Math.max(1,
+                (totalSlots + StorageManager.PAGE_SIZE - 1) / StorageManager.PAGE_SIZE);
+
+        sender.sendMessage("§6" + network.getName() + " stats:");
+        sender.sendMessage("§7Owner: §e" + displayName(network.getOwner(),
+                network.getOwnerName()));
+        sender.sendMessage("§7Access: §e"
+                + (network.isPublic() ? "public" : "private"));
+        sender.sendMessage("§7Members: §e" + network.getMembers().size());
+        sender.sendMessage("§7Containers: §e" + linked + "/"
+                + network.getMaxContainers());
+        sender.sendMessage("§7Pages: §e" + pages);
+        sender.sendMessage("§7Items stored: §e" + network.getStoredItems());
+        sender.sendMessage("§7Total opens: §e" + network.getOpenCount());
+        sender.sendMessage("§7Created: §e" + formatTime(network.getCreatedTime()));
+        sender.sendMessage("§7Last opened: §e" + formatTime(network.getLastOpened()));
+    }
+
+    private String formatTime(long millis) {
+        if (millis <= 0) {
+            return "never";
+        }
+
+        return Instant.ofEpochMilli(millis)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm"));
+    }
+
     private void handleAccess(CommandSender sender, String[] args) {
         if (args.length < 3) {
             sender.sendMessage("§cUsage: /vm access <name> <public|private>");
@@ -414,6 +480,7 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage("§e/vm giveupgrade [amount] §7- Get upgrade items");
         sender.sendMessage("§e/vm members <name> <list|add|remove> [player] §7- Share a network");
         sender.sendMessage("§e/vm access <name> <public|private> §7- Set network access");
+        sender.sendMessage("§e/vm stats [name] §7- View network stats");
         sender.sendMessage("§e/vm list §7- List networks");
         sender.sendMessage("§e/vm delete <name> §7- Delete a network");
         sender.sendMessage("§e/vm cancel §7- Cancel a pending action");
@@ -431,12 +498,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         if (args.length == 1) {
             suggestions.addAll(List.of(
                     "create", "link", "unlink", "open", "upgrade", "giveupgrade",
-                    "members", "access", "list", "delete", "cancel"
+                    "members", "access", "stats", "list", "delete", "cancel"
             ));
         } else if (args.length == 2) {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
 
-            if (List.of("link", "open", "delete", "upgrade", "members", "access")
+            if (List.of("link", "open", "delete", "upgrade", "members", "access", "stats")
                     .contains(subcommand)) {
                 suggestions.addAll(manager.getNetworks().values().stream()
                         .map(StorageNetwork::getName)

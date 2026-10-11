@@ -221,7 +221,11 @@ canvas.addEventListener('mousemove', (e) => {
   if (n.type === 'hub') {
     tip.innerHTML = '<b>' + esc(n.label) + '</b><br>' + n.meta.linked + ' linked / '
       + n.meta.capacity + ' slots<br>' + n.meta.pages + ' page(s), '
-      + n.meta.totalSlots + ' storage slots';
+      + n.meta.totalSlots + ' storage slots<br>'
+      + esc(n.meta.owner || 'unowned') + ' - '
+      + (n.meta.public ? 'public' : 'private')
+      + (n.meta.members ? ', ' + n.meta.members + ' member(s)' : '') + '<br>'
+      + n.meta.storedItems + ' items stored, ' + n.meta.openCount + ' opens';
   } else if (n.type === 'ghost') {
     tip.innerHTML = '<b>Free container slot</b><br>Right-click upgrade item with '
       + '<b>/vm upgrade</b> then link a chest';
