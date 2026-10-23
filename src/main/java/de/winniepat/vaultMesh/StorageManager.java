@@ -7,6 +7,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.Material;
 import org.bukkit.NamespacedKey;
+import org.bukkit.World;
 import org.bukkit.block.Barrel;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
@@ -21,6 +22,8 @@ import org.bukkit.persistence.PersistentDataType;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -100,7 +103,7 @@ public final class StorageManager {
     }
 
     public Map<String, StorageNetwork> getNetworks() {
-        return Map.copyOf(networks);
+        return Collections.unmodifiableMap(new LinkedHashMap<>(networks));
     }
 
     public StorageNetwork getNetwork(String name) {
@@ -279,9 +282,13 @@ public final class StorageManager {
             return false;
         }
 
-        if (!(block.getState() instanceof TileState state)) {
+        BlockState blockState = block.getState();
+
+        if (!(blockState instanceof TileState)) {
             return false;
         }
+
+        TileState state = (TileState) blockState;
 
         String existing = state.getPersistentDataContainer()
                 .get(containerKey, PersistentDataType.STRING);
@@ -337,11 +344,13 @@ public final class StorageManager {
     }
 
     public String getMarkedNetwork(Block block) {
-        if (!(block.getState() instanceof TileState state)) {
+        BlockState state = block.getState();
+
+        if (!(state instanceof TileState)) {
             return null;
         }
 
-        return state.getPersistentDataContainer()
+        return ((TileState) state).getPersistentDataContainer()
                 .get(containerKey, PersistentDataType.STRING);
     }
 
@@ -563,7 +572,7 @@ public final class StorageManager {
         if (meta != null) {
             meta.displayName(Component.text("VaultMesh Upgrade")
                     .color(NamedTextColor.AQUA));
-            meta.lore(List.of(
+            meta.lore(Arrays.asList(
                     Component.text("Hold this and run")
                             .color(NamedTextColor.GRAY),
                     Component.text("/vm upgrade <network>")
@@ -671,7 +680,7 @@ public final class StorageManager {
 
         inventory.setItem(INFO_SLOT, titled(Material.BOOK,
                 Component.text(network.getName()).color(NamedTextColor.GOLD),
-                List.of(
+                Arrays.asList(
                         Component.text("Page " + (page + 1) + " of " + maxPages)
                                 .color(NamedTextColor.GRAY),
                         Component.text(network.getLinkedContainers().size()
@@ -716,10 +725,10 @@ public final class StorageManager {
 
             BlockState state = block.getState();
 
-            if (state instanceof Chest chest) {
-                inventories.add(chest.getBlockInventory());
-            } else if (state instanceof Barrel barrel) {
-                inventories.add(barrel.getInventory());
+            if (state instanceof Chest) {
+                inventories.add(((Chest) state).getBlockInventory());
+            } else if (state instanceof Barrel) {
+                inventories.add(((Barrel) state).getInventory());
             }
         }
 
@@ -821,11 +830,17 @@ public final class StorageManager {
             for (String key : network.getLinkedContainers()) {
                 Block block = blockFromKey(key);
 
-                if (block == null || !(block.getState() instanceof TileState state)) {
+                if (block == null) {
                     continue;
                 }
 
-                state.getPersistentDataContainer().set(
+                BlockState state = block.getState();
+
+                if (!(state instanceof TileState)) {
+                    continue;
+                }
+
+                ((TileState) state).getPersistentDataContainer().set(
                         containerKey,
                         PersistentDataType.STRING,
                         network.getName()
@@ -836,11 +851,13 @@ public final class StorageManager {
     }
 
     private void removeMarker(Block block) {
-        if (!(block.getState() instanceof TileState state)) {
+        BlockState state = block.getState();
+
+        if (!(state instanceof TileState)) {
             return;
         }
 
-        state.getPersistentDataContainer().remove(containerKey);
+        ((TileState) state).getPersistentDataContainer().remove(containerKey);
         state.update();
     }
 
@@ -851,7 +868,7 @@ public final class StorageManager {
             return null;
         }
 
-        var world = Bukkit.getWorld(parts[0]);
+        World world = Bukkit.getWorld(parts[0]);
 
         if (world == null) {
             return null;

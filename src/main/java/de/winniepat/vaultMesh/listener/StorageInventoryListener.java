@@ -12,6 +12,7 @@ import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.PlayerInventory;
 
 public final class StorageInventoryListener implements Listener {
 
@@ -26,24 +27,35 @@ public final class StorageInventoryListener implements Listener {
         Inventory inventory = event.getInventory();
         InventoryHolder holder = inventory.getHolder();
 
-        if (!(holder instanceof NetworkHolder networkHolder)) {
+        if (!(holder instanceof NetworkHolder)) {
             return;
         }
 
-        manager.handleInventoryClose(inventory, networkHolder);
+        manager.handleInventoryClose(inventory, (NetworkHolder) holder);
     }
 
     @EventHandler
     public void onInventoryClick(InventoryClickEvent event) {
-        Inventory top = event.getView().getTopInventory();
+        // NB: never call methods on event.getView(). InventoryView changed from an
+        // abstract class to an interface in 1.21, so call sites compiled against the
+        // old API throw IncompatibleClassChangeError on 1.21+/26.x servers. The
+        // getInventory() contract (the top inventory of the open view) is identical
+        // on every supported version from 1.16.3 to 26.3.
+        Inventory top = event.getInventory();
 
-        if (!(top.getHolder() instanceof NetworkHolder holder)) {
+        InventoryHolder topHolder = top.getHolder();
+
+        if (!(topHolder instanceof NetworkHolder)) {
             return;
         }
 
-        if (!(event.getWhoClicked() instanceof Player player)) {
+        NetworkHolder holder = (NetworkHolder) topHolder;
+
+        if (!(event.getWhoClicked() instanceof Player)) {
             return;
         }
+
+        Player player = (Player) event.getWhoClicked();
 
         int raw = event.getRawSlot();
 
@@ -66,8 +78,7 @@ public final class StorageInventoryListener implements Listener {
         }
 
         if (event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
-                && event.getClickedInventory() != null
-                && event.getClickedInventory().equals(event.getView().getBottomInventory())) {
+                && event.getClickedInventory() instanceof PlayerInventory) {
             event.setCancelled(true);
 
             ItemStack moving = event.getCurrentItem();
@@ -82,11 +93,14 @@ public final class StorageInventoryListener implements Listener {
 
     @EventHandler
     public void onInventoryDrag(InventoryDragEvent event) {
-        Inventory top = event.getView().getTopInventory();
+        Inventory top = event.getInventory();
+        InventoryHolder topHolder = top.getHolder();
 
-        if (!(top.getHolder() instanceof NetworkHolder holder)) {
+        if (!(topHolder instanceof NetworkHolder)) {
             return;
         }
+
+        NetworkHolder holder = (NetworkHolder) topHolder;
 
         for (int slot : event.getRawSlots()) {
             if (slot < 0 || slot >= top.getSize()) {

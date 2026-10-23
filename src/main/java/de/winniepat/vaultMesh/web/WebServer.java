@@ -7,9 +7,11 @@ import de.winniepat.vaultMesh.StorageNetwork;
 import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
@@ -95,10 +97,26 @@ public final class WebServer {
             body = in == null
                     ? "<!doctype html><h1>VaultMesh</h1><p>UI resource missing.</p>"
                     .getBytes(StandardCharsets.UTF_8)
-                    : in.readAllBytes();
+                    : readAllBytes(in);
         }
 
         respond(exchange, 200, "text/html; charset=utf-8", body);
+    }
+
+    /**
+     * Replacement for InputStream#readAllBytes, which only exists on Java 9+.
+     */
+    private static byte[] readAllBytes(InputStream in) throws IOException {
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        byte[] chunk = new byte[4096];
+
+        int read;
+
+        while ((read = in.read(chunk)) != -1) {
+            out.write(chunk, 0, read);
+        }
+
+        return out.toByteArray();
     }
 
     private void handleApi(HttpExchange exchange) throws IOException {
@@ -246,14 +264,27 @@ public final class WebServer {
                 continue;
             }
 
-            String key = URLDecoder.decode(pair.substring(0, eq), StandardCharsets.UTF_8);
+            String key = urlDecode(pair.substring(0, eq));
 
             if (key.equals(name)) {
-                return URLDecoder.decode(pair.substring(eq + 1), StandardCharsets.UTF_8);
+                return urlDecode(pair.substring(eq + 1));
             }
         }
 
         return null;
+    }
+
+    /**
+     * URLDecoder.decode(String, java.nio.charset.Charset) requires Java 10, so the
+     * Java 8 charset-name overload is used instead.
+     */
+    private static String urlDecode(String value) {
+        try {
+            return URLDecoder.decode(value, "UTF-8");
+        } catch (UnsupportedEncodingException exception) {
+            // UTF-8 is always supported.
+            throw new AssertionError(exception);
+        }
     }
 
     private static String quote(String value) {
@@ -268,18 +299,28 @@ public final class WebServer {
             char c = value.charAt(i);
 
             switch (c) {
-                case '"' -> sb.append("\\\"");
-                case '\\' -> sb.append("\\\\");
-                case '\n' -> sb.append("\\n");
-                case '\r' -> sb.append("\\r");
-                case '\t' -> sb.append("\\t");
-                default -> {
+                case '"':
+                    sb.append("\\\"");
+                    break;
+                case '\\':
+                    sb.append("\\\\");
+                    break;
+                case '\n':
+                    sb.append("\\n");
+                    break;
+                case '\r':
+                    sb.append("\\r");
+                    break;
+                case '\t':
+                    sb.append("\\t");
+                    break;
+                default:
                     if (c < 0x20) {
                         sb.append(String.format("\\u%04x", (int) c));
                     } else {
                         sb.append(c);
                     }
-                }
+                    break;
             }
         }
 

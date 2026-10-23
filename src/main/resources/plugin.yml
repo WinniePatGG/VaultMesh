@@ -3,7 +3,7 @@ description: $description
 version: '${version}'
 
 main: de.winniepat.vaultMesh.VaultMesh
-api-version: '1.21.11'
+api-version: '1.13'
 load: POSTWORLD
 
 authors: [WinniePatGG]

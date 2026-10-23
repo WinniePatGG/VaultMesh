@@ -13,9 +13,11 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
 
@@ -57,10 +59,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         }
 
         if (subcommand.equals("cancel")) {
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             manager.cancelPendingAction(player);
             player.sendMessage("§7Pending VaultMesh action cancelled.");
@@ -77,7 +81,7 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            Player creator = sender instanceof Player player ? player : null;
+            Player creator = sender instanceof Player ? (Player) sender : null;
 
             if (!manager.createNetwork(args[1], creator)) {
                 sender.sendMessage("§cThat name is invalid or already exists.");
@@ -109,10 +113,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         }
 
         if (subcommand.equals("link")) {
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             if (args.length < 2) {
                 sender.sendMessage("§cUsage: /vm link <name>");
@@ -134,10 +140,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         }
 
         if (subcommand.equals("unlink")) {
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             manager.startUnlink(player);
             player.sendMessage("§eRight-click a linked container to unlink it.");
@@ -151,10 +159,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             if (args.length < 2) {
                 player.sendMessage("§cUsage: /vm open <name>");
@@ -166,10 +176,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         }
 
         if (subcommand.equals("upgrade")) {
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             if (args.length < 2) {
                 sender.sendMessage("§cUsage: /vm upgrade <name>");
@@ -204,10 +216,12 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
                 return true;
             }
 
-            if (!(sender instanceof Player player)) {
+            if (!(sender instanceof Player)) {
                 sender.sendMessage("This command can only be used by a player.");
                 return true;
             }
+
+            Player player = (Player) sender;
 
             int amount = 1;
 
@@ -255,9 +269,11 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
     }
 
     private boolean allowManage(CommandSender sender, String networkName) {
-        if (!(sender instanceof Player player)) {
+        if (!(sender instanceof Player)) {
             return requireManage(sender);
         }
+
+        Player player = (Player) sender;
 
         if (player.hasPermission("vaultmesh.manage")) {
             return true;
@@ -453,7 +469,14 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
             return online;
         }
 
-        return Bukkit.getOfflinePlayerIfCached(name);
+        try {
+            return Bukkit.getOfflinePlayerIfCached(name);
+        } catch (NoSuchMethodError error) {
+            // Server#getOfflinePlayerIfCached was added in the 1.16.5 era. Very old
+            // Paper builds (e.g. 1.16.3) do not have it; players that are not online
+            // must then have joined the server so they appear in its local cache.
+            return null;
+        }
     }
 
     private String displayName(UUID id, String fallback) {
@@ -496,26 +519,26 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
         List<String> suggestions = new ArrayList<>();
 
         if (args.length == 1) {
-            suggestions.addAll(List.of(
+            suggestions.addAll(Arrays.asList(
                     "create", "link", "unlink", "open", "upgrade", "giveupgrade",
                     "members", "access", "stats", "list", "delete", "cancel"
             ));
         } else if (args.length == 2) {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
 
-            if (List.of("link", "open", "delete", "upgrade", "members", "access", "stats")
+            if (Arrays.asList("link", "open", "delete", "upgrade", "members", "access", "stats")
                     .contains(subcommand)) {
                 suggestions.addAll(manager.getNetworks().values().stream()
                         .map(StorageNetwork::getName)
-                        .toList());
+                        .collect(Collectors.toList()));
             }
         } else if (args.length == 3) {
             String subcommand = args[0].toLowerCase(Locale.ROOT);
 
             if (subcommand.equals("members")) {
-                suggestions.addAll(List.of("list", "add", "remove"));
+                suggestions.addAll(Arrays.asList("list", "add", "remove"));
             } else if (subcommand.equals("access")) {
-                suggestions.addAll(List.of("public", "private"));
+                suggestions.addAll(Arrays.asList("public", "private"));
             }
         } else if (args.length == 4 && args[0].equalsIgnoreCase("members")) {
             String action = args[2].toLowerCase(Locale.ROOT);
@@ -523,7 +546,7 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
             if (action.equals("add") || action.equals("remove")) {
                 suggestions.addAll(Bukkit.getOnlinePlayers().stream()
                         .map(Player::getName)
-                        .toList());
+                        .collect(Collectors.toList()));
             }
         }
 
@@ -531,6 +554,6 @@ public final class VaultMeshCommand implements CommandExecutor, TabCompleter {
 
         return suggestions.stream()
                 .filter(value -> value.toLowerCase(Locale.ROOT).startsWith(prefix))
-                .toList();
+                .collect(Collectors.toList());
     }
 }

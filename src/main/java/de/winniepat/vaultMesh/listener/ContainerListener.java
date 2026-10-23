@@ -1,6 +1,7 @@
 package de.winniepat.vaultMesh.listener;
 
 import de.winniepat.vaultMesh.StorageManager;
+import org.bukkit.Material;
 import org.bukkit.block.Block;
 import org.bukkit.block.BlockState;
 import org.bukkit.block.TileState;
@@ -90,9 +91,10 @@ public final class ContainerListener implements Listener {
     }
 
     private boolean isSupportedContainer(Block block) {
-        return switch (block.getType()) {
-            case CHEST, TRAPPED_CHEST, BARREL -> true;
-            default -> false;
-        };
+        Material type = block.getType();
+
+        return type == Material.CHEST
+                || type == Material.TRAPPED_CHEST
+                || type == Material.BARREL;
     }
 }

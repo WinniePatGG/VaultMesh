@@ -4,7 +4,9 @@ import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.configuration.file.FileConfiguration;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
@@ -91,7 +93,7 @@ public final class NetworkRepository {
             String path = "networks." + network.getName();
 
             config.set(path + ".containers",
-                    network.getLinkedContainers().stream().toList());
+                    new ArrayList<>(network.getLinkedContainers()));
             config.set(path + ".max-containers", network.getMaxContainers());
 
             if (network.getOwner() != null) {
@@ -100,8 +102,14 @@ public final class NetworkRepository {
             }
 
             config.set(path + ".public", network.isPublic());
-            config.set(path + ".members",
-                    network.getMembers().stream().map(UUID::toString).toList());
+
+            List<String> memberIds = new ArrayList<>();
+
+            for (UUID memberId : network.getMembers()) {
+                memberIds.add(memberId.toString());
+            }
+
+            config.set(path + ".members", memberIds);
 
             config.set(path + ".stats.created", network.getCreatedTime());
             config.set(path + ".stats.opens", network.getOpenCount());
