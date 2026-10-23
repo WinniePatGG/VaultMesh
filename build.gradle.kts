@@ -32,7 +32,7 @@ val javaRelease: Int = providers.gradleProperty("javaRelease").orElse("8").get()
 
 // Version used for the local runPaper dev server. Override with -PdevMinecraftVersion=, e.g.
 //   gradlew runServer -PdevMinecraftVersion=1.16.5
-val devMinecraftVersion: String = providers.gradleProperty("devMinecraftVersion").orElse("1.20.4").get()
+val devMinecraftVersion: String = providers.gradleProperty("devMinecraftVersion").orElse("1.21.11").get()
 
 dependencies {
     compileOnly("com.destroystokyo.paper:paper-api:1.16.5-R0.1-SNAPSHOT")
